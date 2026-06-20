@@ -7,8 +7,10 @@ export const useFluidStore = defineStore('fluid', {
     engine: null as SPHEngine | null,
     isRunning: false,
     particleCount: 800,
+    defaultParticleCount: 800,
     currentPreset: PRESETS[0],
     params: { ...DEFAULT_PARAMS } as SimParams,
+    defaultParams: { ...DEFAULT_PARAMS } as SimParams,
     fps: 0,
     frameCount: 0,
     _animId: null as number | null,
@@ -27,19 +29,48 @@ export const useFluidStore = defineStore('fluid', {
       if (!state.engine || state.engine.particles.length === 0) return 0
       return Math.max(...state.engine.particles.map(p => Math.sqrt(p.vx * p.vx + p.vy * p.vy)))
     },
+    isParamModified: (state) => (key: keyof SimParams) => {
+      return state.params[key] !== state.defaultParams[key]
+    },
+    isParticleCountModified: (state) => {
+      return state.particleCount !== state.defaultParticleCount
+    },
   },
   actions: {
     initSimulation(preset?: Preset) {
       if (preset) {
         this.currentPreset = preset
         this.params = { ...DEFAULT_PARAMS, ...preset.params }
+        this.defaultParams = { ...this.params }
         this.particleCount = preset.particleCount
+        this.defaultParticleCount = preset.particleCount
       }
       const canvas = { width: 800, height: 500 }
       this.engine = new SPHEngine(this.particleCount, canvas.width, canvas.height, this.params)
       this.engine.initParticles(this.currentPreset.initialConfig, this.particleCount)
       this.frameCount = 0
       this.fps = 0
+    },
+    resetParam(key: keyof SimParams) {
+      const defaultValue = this.defaultParams[key]
+      this.params[key] = defaultValue
+      if (this.engine) {
+        this.engine.params[key] = defaultValue
+        if (key === 'smoothingRadius') {
+          this.engine['cellSize'] = defaultValue
+        }
+      }
+    },
+    resetParticleCount() {
+      this.particleCount = this.defaultParticleCount
+    },
+    resetAllParams() {
+      this.params = { ...this.defaultParams }
+      this.particleCount = this.defaultParticleCount
+      if (this.engine) {
+        this.engine.params = { ...this.defaultParams }
+        this.engine['cellSize'] = this.defaultParams.smoothingRadius
+      }
     },
     start() {
       if (this.isRunning || !this.engine) return
